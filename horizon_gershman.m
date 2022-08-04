@@ -1,17 +1,14 @@
 clear
 
 %hyper params
-
-global exhaustive;
-exhaustive = 0;
 global c;
 global b;
 b = 0.5;
 future_const = 1;
 c = 1;
-hard_coded_example = 1;
+hard_coded_example = 0;
 learning_rate = 0.5;
-horizon = 11;
+horizon = 10;
 equal = 0;  
 bucket_size = 5;
 num_trials = 500;
@@ -21,15 +18,15 @@ global precision;
 global epi_c;
 global nov_c;
 global lambda;
-mean_difference = 10;
+mean_difference = 20;
 epi_c = 1;
 nov_c = 1;
 lambda = 1;
 gamma = 1;
 hard_coded_left_mean = 40;
 hard_coded_right_mean = 50;
-hardcoded_left = [55, 49, 56, 39, 40, 31, 27, 42, 49, 41, 40];
-hardcoded_right = [47, 45, 55, 52, 50, 55, 51, 53, 61, 42, 50];
+hardcoded_left = [55, 49, 56, 39, 40, 31, 27, 42, 49, 41];
+hardcoded_right = [47, 45, 55, 52, 50, 55, 51, 53, 61, 50];
 UCB = 0;
 Thompson = 0;
 %%%%
@@ -42,7 +39,7 @@ else
      left_mean = hard_coded_left_mean;
      right_mean = hard_coded_right_mean;
 end
-cc = zeros(100,horizon-1);
+cc = zeros(100,horizon);
 for epoch = 1:1
 
 if left_mean > right_mean
@@ -81,16 +78,16 @@ right_posterior = 50;
 q = [100, 100];
 t = 0;
 auto = 1;
-while t < horizon
+while t <= horizon
     % for first 4 rounds, the game is played automatically, either with
     % equal or unequal representation from both choices
     if auto == 1
         if equal == 1
             if hard_coded_example == 0
-                [obs_left, left_posterior, q(1)] = sample_and_update(left_mean, left_posterior, std_dev,q(1), learning_rate, obs_left);
-                [obs_left, left_posterior, q(1)] = sample_and_update(left_mean, left_posterior, std_dev,q(1), learning_rate, obs_left);
-                [obs_right, right_posterior, q(2)] = sample_and_update(right_mean, right_posterior, std_dev,q(2), learning_rate, obs_right);
-                [obs_right, right_posterior, q(2)] = sample_and_update(right_mean, right_posterior, std_dev,q(2), learning_rate, obs_right);
+                [obs_left, left_posterior, q(1)] = sample_and_update(left_mean, left_posterior, std_dev,q(1), obs_left);
+                [obs_left, left_posterior, q(1)] = sample_and_update(left_mean, left_posterior, std_dev,q(1), obs_left);
+                [obs_right, right_posterior, q(2)] = sample_and_update(right_mean, right_posterior, std_dev,q(2), obs_right);
+                [obs_right, right_posterior, q(2)] = sample_and_update(right_mean, right_posterior, std_dev,q(2), obs_right);
             else
                 [obs_left, left_posterior, q(1)] = hardcoded_number(hardcoded_left(1), left_posterior, std_dev,q(1), obs_left);
                 [obs_left, left_posterior, q(1)] = hardcoded_number(hardcoded_left(2), left_posterior, std_dev,q(1), obs_left);
@@ -106,15 +103,15 @@ while t < horizon
             else
                 side = randsample(2,1);
                 if side == 1
-                    [obs_left, left_posterior, q(1)] = sample_and_update(left_mean,left_posterior, std_dev, std_dev,q(1), obs_left);
-                    [obs_left, left_posterior, q(1)] = sample_and_update(left_mean, left_posterior, std_dev, std_dev,q(1), obs_left);
-                    [obs_left, left_posterior, q(1)] = sample_and_update(left_mean, left_posterior, std_dev, std_dev,q(1), obs_left);
-                    [obs_right, right_posterior, q(2)] = sample_and_update(right_mean, right_posterior, std_dev, std_dev,q(2), obs_right);
+                    [obs_left, left_posterior, q(1)] = sample_and_update(left_mean,left_posterior, std_dev,q(1), obs_left);
+                    [obs_left, left_posterior, q(1)] = sample_and_update(left_mean, left_posterior, std_dev,q(1), obs_left);
+                    [obs_left, left_posterior, q(1)] = sample_and_update(left_mean, left_posterior, std_dev,q(1), obs_left);
+                    [obs_right, right_posterior, q(2)] = sample_and_update(right_mean, right_posterior, std_dev,q(2), obs_right);
                 else
-                    [obs_left, left_posterior, q(1)] = sample_and_update(left_mean, left_posterior, std_dev, std_dev,q(1), obs_left);
-                    [obs_right, right_posterior, q(2)] = sample_and_update(left_mean, left_posterior, std_dev, std_dev,q(2), obs_right);
-                    [obs_right, right_posterior, q(2)] = sample_and_update(left_mean, right_posterior, std_dev, std_dev,q(2), obs_right);
-                    [obs_right, right_posterior, q(2)] = sample_and_update(right_mean, right_posterior, std_dev, std_dev,q(2), obs_right);
+                    [obs_left, left_posterior, q(1)] = sample_and_update(left_mean, left_posterior, std_dev,q(1), obs_left);
+                    [obs_right, right_posterior, q(2)] = sample_and_update(left_mean, left_posterior, std_dev,q(2), obs_right);
+                    [obs_right, right_posterior, q(2)] = sample_and_update(left_mean, right_posterior, std_dev,q(2), obs_right);
+                    [obs_right, right_posterior, q(2)] = sample_and_update(right_mean, right_posterior, std_dev,q(2), obs_right);
                    
                 end
             end
@@ -141,6 +138,7 @@ while t < horizon
         end
    
         choices(trial,t) = choice;
+        if t < horizon
         if choice == 1
             if hard_coded_example == 0
                 [obs_left, left_posterior, q] = sample_and_update(left_mean, left_posterior, std_dev, q, obs_left);
@@ -154,6 +152,7 @@ while t < horizon
                 [obs_right, right_posterior, q] = hardcoded_number(hardcoded_right(2), right_posterior, std_dev, q, obs_right);
             end
         end
+        end
     end
     
     t = t+1;
@@ -164,7 +163,7 @@ end
 end
 correct_count = 0;
 
-for i = 5:horizon-1
+for i = 5:horizon
     for j = 1:num_trials
         if choices(j,i) == correct_choice
             correct_count = correct_count + 1;

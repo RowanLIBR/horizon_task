@@ -2,16 +2,16 @@ clear
 
 %hyper params
 global use_ppbs
-use_ppbs = 1;
+use_ppbs = 0;
 global exhaustive;
 exhaustive = 0;
 global c;
 future_const = 1;
 c = 1;
-hard_coded_example = 1;
+hard_coded_example = 0;
 learning_rate = 30;
-horizon = 11;
-equal = 0;  
+horizon = 10;
+equal = 1;  
 bucket_size = 5;
 num_trials = 500;
 gambling_bias = 1;
@@ -24,11 +24,9 @@ nov_c = 1;
 precision = 1/200;
 hard_coded_left_mean = 40;
 hard_coded_right_mean = 50;
-hardcoded_left = [55, 49, 56, 39, 40, 31, 27, 42, 49, 41, 40];
-hardcoded_right = [47, 45, 55, 52, 50, 55, 51, 53, 61, 42, 50];
+hardcoded_left = [55, 49, 56, 39, 40, 31, 27, 42, 49, 41];
+hardcoded_right = [47, 45, 55, 52, 50, 55, 51, 53, 61, 50];
 %%%%
-N_left = 1;
-N_right = 1;
 global correct_choice;
 if hard_coded_example == 0
     [left_mean, right_mean] = getMeans(mean_difference);
@@ -36,7 +34,7 @@ else
      left_mean = hard_coded_left_mean;
      right_mean = hard_coded_right_mean;
 end
-cc = zeros(100,horizon-1);
+cc = zeros(100,horizon);
 for epoch = 1:1
 
 if left_mean > right_mean
@@ -75,7 +73,7 @@ x = [1:1:100];
 
 t = 0;
 auto = 1;
-while t < horizon-1
+while t <= horizon
     % for first 4 rounds, the game is played automatically, either with
     % equal or unequal representation from both choices
     if auto == 1
@@ -156,9 +154,10 @@ while t < horizon-1
         std_prior = round(calc_std(estimate_left_mean, estimate_right_mean, obs_right, obs_left));
         
         
-        G = forward_tree_search(left_mean_prior, right_mean_prior, std_prior, a, d, t, obs_left, obs_right, estimate_left_mean, estimate_right_mean, horizon, learning_rate, bucket_size, t, N_left, N_right);
+        G = forward_tree_search(left_mean_prior, right_mean_prior, std_prior, a, d, t, obs_left, obs_right, estimate_left_mean, estimate_right_mean, horizon, learning_rate, bucket_size, t);
         [maxi, choice] = max(G);
         choices(trial,t) = choice;
+        if t < horizon
         if choice == 1
             if hard_coded_example == 0
                 left_1 = max(1,round(normrnd(left_mean, std_dev)));
@@ -193,13 +192,13 @@ while t < horizon-1
     
     t = t+1;
     
-    
+    end
 end
 
 end
 correct_count = 0;
 
-for i = 5:horizon-1
+for i = 5:horizon
     for j = 1:num_trials
         if choices(j,i) == correct_choice
             correct_count = correct_count + 1;
@@ -211,14 +210,13 @@ end
 cc(epoch,:) = correct_counts;
 end
 result = sum(cc,1)/epoch;
-function G = forward_tree_search(left_mean, right_mean, std_dev, a, d, t, obs_left, obs_right, estimate_left_mean, estimate_right_mean, horizon, learning_rate, bucket_size, true_t, N_left, N_right)
+function G = forward_tree_search(left_mean, right_mean, std_dev, a, d, t, obs_left, obs_right, estimate_left_mean, estimate_right_mean, horizon, learning_rate, bucket_size, true_t)
     global use_ppbs
     global exhaustive
     global correct_choice
     global precision
     global epi_c;
     global nov_c;
-    global use_UCB;
     global c;
     G = [0, 0];
     d_prior = d{1};
@@ -235,26 +233,29 @@ function G = forward_tree_search(left_mean, right_mean, std_dev, a, d, t, obs_le
     G(1) = G(1) + predicted_obs_left*precision;
     
     if t < horizon
-        if (use_ppbs == 1)
-            a_prior = a{1};
-            a{1}(mean_bucket) = a{1}(mean_bucket) + learning_rate;    
+        a_prior = a{1};
+        if use_ppbs == 1 
+            a{1}(mean_bucket) = a{1}(mean_bucket) + learning_rate;   
             novelty = kldir(normalise(a_prior), normalise(a{1}));
-            epi = kldir(normalise(d_prior), normalise(d{1}));
-            G(1) = G(1) + nov_c*novelty + epi_c*epi;
-        end
+        else
+            a_temp = a{1};
+            a_temp(mean_bucket) = a_temp(mean_bucket) + learning_rate;
+            novelty = kldir(normalise(a_prior), normalise(a_temp));
+        end     
+        epi = kldir(normalise(d_prior), normalise(d{1}));
+        G(1) = G(1) + nov_c*novelty + epi_c*epi;
         norm_left = normalise(a{1});
         if exhaustive == 0
             left_mean_prior = (find(cumsum(norm_left) >= rand,1))*bucket_size;
             left_mean_prior = randi([left_mean_prior-bucket_size left_mean_prior],1);
             std_dev = round(calc_std(estimate_left_mean, estimate_right_mean, obs_right, obs_left));
-            N_left = N_left + 1;
-            E = forward_tree_search(left_mean_prior, right_mean, std_dev, a, d, t+1, obs_left, obs_right, estimate_left_mean, estimate_right_mean, horizon, learning_rate, bucket_size, true_t, N_left, N_right);
+            E = forward_tree_search(left_mean_prior, right_mean, std_dev, a, d, t+1, obs_left, obs_right, estimate_left_mean, estimate_right_mean, horizon, learning_rate, bucket_size, true_t);
             G(1) = G(1) + 0.7 * max(E);
         else
             for mean = 1:numel(a{1})
                 left_mean_prior = randi([mean*10-bucket_size mean*10],1);
                 std_dev = round(calc_std(estimate_left_mean, estimate_right_mean, obs_right, obs_left));
-                E = forward_tree_search(left_mean_prior, right_mean, std_dev, a, d, t+1, obs_left, obs_right, estimate_left_mean, estimate_right_mean, horizon, learning_rate, bucket_size, true_t, N_left, N_right);
+                E = forward_tree_search(left_mean_prior, right_mean, std_dev, a, d, t+1, obs_left, obs_right, estimate_left_mean, estimate_right_mean, horizon, learning_rate, bucket_size, true_t);
                 G(1) = G(1) + a{1}(mean)*max(E);
             end
         end
@@ -271,31 +272,31 @@ function G = forward_tree_search(left_mean, right_mean, std_dev, a, d, t, obs_le
     
     mean_bucket = ceil(predicted_obs_right/bucket_size);
     G(2) = G(2) + predicted_obs_right*precision;
-    if use_UCB == 1
-        G(2) = G(2) + c*sqrt(log(t)/N_right);
-    end
     
-    norm_right = normalise(a{2});
     if t < horizon
-        if (use_ppbs == 1)
-            a_prior = a{2};
-            a{2}(mean_bucket) = a{2}(mean_bucket) + learning_rate;
+        a_prior = a{2};
+        if use_ppbs == 1 
+            a{2}(mean_bucket) = a{2}(mean_bucket) + learning_rate;   
             novelty = kldir(normalise(a_prior), normalise(a{2}));
-            epi = kldir(normalise(d_prior), normalise(d{1}));
-            G(2) = G(2) + nov_c*novelty + epi_c*epi;
-        end
+        else
+            a_temp = a{2};
+            a_temp(mean_bucket) = a_temp(mean_bucket) + learning_rate;
+            novelty = kldir(normalise(a_prior), normalise(a_temp));
+        end          
+        epi = kldir(normalise(d_prior), normalise(d{1}));
+        G(2) = G(2) + nov_c*novelty + epi_c*epi;
+        norm_right = normalise(a{2});
         if exhaustive == 0
             right_mean_prior = (find(cumsum(norm_right) >= rand,1))*bucket_size;
             right_mean_prior = randi([right_mean_prior-bucket_size right_mean_prior],1);
             std_dev = round(calc_std(estimate_left_mean, estimate_right_mean, obs_right, obs_left));
-            N_right = N_right + 1;
-            E = forward_tree_search(left_mean, right_mean_prior, std_dev, a, d, t+1, obs_left, obs_right, estimate_left_mean, estimate_right_mean, horizon, learning_rate,bucket_size, true_t, N_left, N_right);
+            E = forward_tree_search(left_mean, right_mean_prior, std_dev, a, d, t+1, obs_left, obs_right, estimate_left_mean, estimate_right_mean, horizon, learning_rate,bucket_size, true_t);
             G(2) = G(2) + 0.7 * max(E);
         else
             for mean = 1:numel(a{2})
                 right_mean_prior = randi([mean*10-bucket_size mean*10],1);
                 std_dev = round(calc_std(estimate_left_mean, estimate_right_mean, obs_right, obs_left));
-                E = forward_tree_search(left_mean, right_mean_prior, std_dev, a, d, t+1, obs_left, obs_right, estimate_left_mean, estimate_right_mean, horizon, learning_rate, bucket_size, true_t, N_left, N_right);
+                E = forward_tree_search(left_mean, right_mean_prior, std_dev, a, d, t+1, obs_left, obs_right, estimate_left_mean, estimate_right_mean, horizon, learning_rate, bucket_size, true_t);
                 G(1) = G(1) + a{1}(mean)*max(E);
             end
         end
